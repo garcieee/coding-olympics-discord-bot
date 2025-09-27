@@ -11,13 +11,10 @@ from Core import compile_members
 # --------------------
 # setup
 # --------------------
-intents = discord.Intents.default()
-intents.message_content = True
 intents = compile_members.setup_member_intents()
-
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# simple flag to prevent double on_ready execution
+# prevent double on_ready
 already_ready = False
 
 
@@ -28,8 +25,11 @@ already_ready = False
 async def on_ready():
     global already_ready
     if already_ready:
-        return  # stop if on_ready fired twice
+        return
     already_ready = True
+
+    # load cache from JSON if available
+    compile_members.load_cache_from_file()
 
     print(f"✅ Logged in as {bot.user} (id: {bot.user.id})")
 
@@ -68,30 +68,37 @@ async def add(ctx, arg, arg2):
 
 @bot.command()
 async def cache_members(ctx):
-    # make sure cache only runs once per command call
     await compile_members.cache_all_guilds_members(bot)
-    info = compile_members.member_cache.get_cache_info()
+    info = compile_members.get_member_cache().get_cache_info()
     await ctx.send(
-        f"Cached {info['member_count']} members. "
+        f"✅ Cached {info['member_count']} members. "
         f"Last updated: {info['last_updated']}"
     )
 
 
 @bot.command()
-async def member_lookup(ctx, member_id: int):
-    details = compile_members.get_member_cache().get_member_details(member_id)
+async def member_lookup(ctx, *, query: str):
+    cache = compile_members.get_member_cache()
+
+    if query.isdigit():
+        details = cache.get_member_details(int(query))
+    else:
+        results = cache.search_members(query)
+        details = results[0] if results else None
+
     if details:
+        roles = details.get("roles", [])
         await ctx.send(
             f"🔍 {details['display_name']} "
-            f"(Roles: {', '.join(details['roles'])})"
+            f"(Roles: {', '.join(roles) if roles else 'None'})"
         )
     else:
-        await ctx.send("Member not found in cache.")
+        await ctx.send("❌ Member not found.")
 
 
 @bot.command()
 async def search_member(ctx, *, query: str):
-    results = compile_members.get_member_cache().search_members(query)
+    results = compile_members.search_members(query)
     if results:
         names = ", ".join([r['display_name'] for r in results])
         await ctx.send(f"Found: {names}")
