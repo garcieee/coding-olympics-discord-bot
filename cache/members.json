@@ -97,7 +97,7 @@
                 "Purple"
             ],
             "is_bot": false,
-            "status": "online"
+            "status": "offline"
         },
         "371665543826243586": {
             "id": 371665543826243586,
@@ -229,7 +229,7 @@
                 "Green"
             ],
             "is_bot": false,
-            "status": "idle"
+            "status": "offline"
         },
         "687736343736090744": {
             "id": 687736343736090744,
@@ -449,7 +449,7 @@
                 "Events Department"
             ],
             "is_bot": false,
-            "status": "online"
+            "status": "offline"
         },
         "728452713691611312": {
             "id": 728452713691611312,
@@ -747,5 +747,5 @@
             "status": "offline"
         }
     },
-    "last_updated": "2025-09-27T23:52:31.041079"
+    "last_updated": "2025-09-28T00:42:18.378241"
 }
