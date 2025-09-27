@@ -12,7 +12,6 @@ A Discord bot for managing student rankings and leaderboards in coding olympics 
 1. Open your shell config file:
    ```bash
    nano ~/.zshrc
-````
 
 2. Add the following line at the bottom (replace with your actual bot token):
 
