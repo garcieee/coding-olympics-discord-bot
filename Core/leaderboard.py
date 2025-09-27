@@ -1,11 +1,14 @@
 """
 Leaderboard system for the Discord bot.
 Tracks wins, ranks, and persists data in JSON.
+Also can cache all human members from the server automatically.
 """
 
 import json
 import os
 from typing import Dict, Optional, List
+from datetime import datetime
+import discord
 
 LEADERBOARD_FILE = "cache/leaderboard.json"
 
@@ -13,6 +16,7 @@ LEADERBOARD_FILE = "cache/leaderboard.json"
 class Leaderboard:
     def __init__(self):
         self.scores: Dict[int, dict] = {}  # {user_id: {"display_name": str, "wins": int}}
+        self.last_updated: Optional[str] = None
         self.load_from_file()
 
     # ----------------
@@ -61,47 +65,49 @@ class Leaderboard:
         return None
 
     # ----------------
+    # caching all guild members
+    # ----------------
+    async def cache_guild_members(self, guild: discord.Guild) -> None:
+        """Add all human members in a guild to the leaderboard."""
+        count = 0
+        for member in guild.members:
+            if not member.bot:
+                self.ensure_member(member.id, member.display_name)
+                count += 1
+        self.last_updated = datetime.now().isoformat()
+        self.save_to_file()
+        print(f"✅ Cached {count} members from {guild.name}")
+
+    async def cache_all_guilds(self, bot) -> None:
+        """Add all human members from all guilds to the leaderboard."""
+        print("Starting leaderboard cache process...")
+        self.scores.clear()
+        for guild in bot.guilds:
+            await self.cache_guild_members(guild)
+        print(f"✅ Leaderboard caching complete! Total members: {len(self.scores)}")
+        print("Last updated:", self.last_updated)
+
+    # ----------------
     # persistence
     # ----------------
     def save_to_file(self):
         os.makedirs("cache", exist_ok=True)
+        data = {
+            "scores": self.scores,
+            "last_updated": self.last_updated
+        }
         with open(LEADERBOARD_FILE, "w", encoding="utf-8") as f:
-            json.dump(self.scores, f, indent=4, ensure_ascii=False)
+            json.dump(data, f, indent=4, ensure_ascii=False)
 
     def load_from_file(self):
         if os.path.exists(LEADERBOARD_FILE):
             with open(LEADERBOARD_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                # Convert keys back to int
-                self.scores = {int(k): v for k, v in data.items()}
+                self.scores = {int(k): v for k, v in data.get("scores", {}).items()}
+                self.last_updated = data.get("last_updated")
 
 
-# Global leaderboard instance
+# ----------------
+# global instance
+# ----------------
 leaderboard = Leaderboard()
-
-
-# ----------------
-# helper functions
-# ----------------
-def ensure_member(user_id: int, display_name: str):
-    leaderboard.ensure_member(user_id, display_name)
-
-
-def add_win(user_id: int, display_name: str):
-    leaderboard.add_win(user_id, display_name)
-
-
-def set_wins(user_id: int, display_name: str, wins: int):
-    leaderboard.set_wins(user_id, display_name, wins)
-
-
-def get_member_stats(user_id: int) -> Optional[dict]:
-    return leaderboard.get_member_stats(user_id)
-
-
-def get_leaderboard(top_n: int = 10) -> List[dict]:
-    return leaderboard.get_leaderboard(top_n)
-
-
-def get_rank(user_id: int) -> Optional[int]:
-    return leaderboard.get_rank(user_id)
