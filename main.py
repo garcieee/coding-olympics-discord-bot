@@ -29,7 +29,7 @@ async def test(ctx, arg):
 
 
 def Add(num, num2):
-    return num + num2
+    return int(num) + int(num2)
 
 @bot.command()
 async def add(ctx, arg, arg2):
