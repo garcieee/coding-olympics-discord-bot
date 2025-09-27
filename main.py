@@ -3,6 +3,9 @@ import os
 from discord.ext import commands
 from Core import leaderboard
 from Core import compile_members
+
+from dotenv import load_dotenv
+
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -61,4 +64,9 @@ async def search_member(ctx, *, query: str):
         await ctx.send("No members found.")
 
 
-bot.run(os.getenv("COMPILED_TOKEN"))
+# Get the Discord bot token from .env file. sorry person who made this is a windows user
+load_dotenv(dotenv_path=os.path.abspath(".env"))
+
+token = os.getenv("COMPILED_TOKEN")
+print("Token loaded:", token)
+bot.run(token)
