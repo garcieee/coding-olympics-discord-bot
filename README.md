@@ -1,5 +1,4 @@
 
-````markdown
 # // COMPILED BOT
 
 A Discord bot for managing student rankings and leaderboards in coding olympics events.
