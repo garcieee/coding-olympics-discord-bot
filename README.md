@@ -1,4 +1,3 @@
-Perfect 👌 Here’s a clean **README.md** you can copy directly into your project:
 
 ````markdown
 # // COMPILED BOT
