@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 # local imports
 from Core.leaderboard import leaderboard  # global instance
 from Core import compile_members
+from Utils import db
+intents = discord.Intents.default()
+intents.message_content = True
 
 # --------------------
 # setup
@@ -25,7 +28,7 @@ async def on_ready():
     if already_ready:
         return
     already_ready = True
-
+    
     # load cache from JSON if available
     compile_members.load_cache_from_file()
 
@@ -34,7 +37,6 @@ async def on_ready():
 # --------------------
 # leaderboard commands
 # --------------------
-
 @bot.command()
 async def cache_leaderboard(ctx):
     await leaderboard.cache_all_guilds(bot)
@@ -66,7 +68,6 @@ async def myrank(ctx):
     await ctx.send(
         f"📊 {stats['display_name']} — {stats['wins']} wins (Rank #{rank})"
     )
-
 @bot.command()
 async def lookup(ctx, member: discord.Member):
     """Look up another member’s stats."""
@@ -77,7 +78,6 @@ async def lookup(ctx, member: discord.Member):
     await ctx.send(
         f"🔍 {stats['display_name']} — {stats['wins']} wins (Rank #{rank})"
     )
-
 @bot.command()
 async def addwin(ctx, member: discord.Member = None):
     """Add a win to a member (or yourself)."""
@@ -109,21 +109,10 @@ async def cache_members(ctx):
     )
 
 @bot.command()
-async def member_lookup(ctx, *, query: str):
-    cache = compile_members.get_member_cache()
-
-    if query.isdigit():
-        details = cache.get_member_details(int(query))
-    else:
-        results = cache.search_members(query)
-        details = results[0] if results else None
-
+async def member_lookup(ctx, member_id: int):
+    details = compile_members.get_member_cache().get_member_details(member_id)
     if details:
-        roles = details.get("roles", [])
-        await ctx.send(
-            f"🔍 {details['display_name']} "
-            f"(Roles: {', '.join(roles) if roles else 'None'})"
-        )
+        await ctx.send(f"🔍 {details['display_name']} (Roles: {', '.join(details['roles'])})")
     else:
         await ctx.send("❌ Member not found.")
 
@@ -135,6 +124,11 @@ async def search_member(ctx, *, query: str):
         await ctx.send(f"Found: {names}")
     else:
         await ctx.send("No members found.")
+
+@bot.command()
+async def appendDB(ctx):
+    db.TestAppend()
+    await ctx.send("Test...")
 
 # --------------------
 # run bot

@@ -29,7 +29,7 @@ class Leaderboard:
             self.save_to_file()
 
     def add_win(self, user_id: int, display_name: str) -> None:
-        """Increase a user’s wins by 1 (or create if missing)."""
+        """Increase a user's wins by 1 (or create if missing)."""
         self.ensure_member(user_id, display_name)
         self.scores[user_id]["wins"] += 1
         self.save_to_file()
