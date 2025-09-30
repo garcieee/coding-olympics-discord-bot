@@ -14,7 +14,7 @@ from Core import compile_members
 # --------------------
 load_dotenv(dotenv_path=os.path.abspath(".env"))
 intents = compile_members.setup_member_intents()
-bot = commands.Bot(command_prefix="#", intents=intents, help_command=None)  # disable default help
+bot = commands.Bot(command_prefix="//", intents=intents, help_command=None)  # disable default help
 
 # --------------------
 # start ticketing cog (adds cog to bot)
@@ -45,9 +45,9 @@ async def help_command(ctx):
     embed.add_field(
         name="🏆 Leaderboard",
         value=(
-            "`#leaderboard` - Show the top leaderboard\n"
-            "`#myrank` - Show your rank & wins\n"
-            "`#lookup @member` - Look up another member’s stats"
+            "`//leaderboard` - Show the top leaderboard\n"
+            "`//myrank` - Show your rank & wins\n"
+            "`//lookup @member` - Look up another member’s stats"
         ),
         inline=False
     )
@@ -55,15 +55,15 @@ async def help_command(ctx):
     embed.add_field(
         name="👥 Members (view/search)",
         value=(
-            "`#member_lookup <id>` - Lookup a member by ID\n"
-            "`#search_member <query>` - Search for members"
+            "`//member_lookup <id>` - Lookup a member by ID\n"
+            "`//search_member <query>` - Search for members"
         ),
         inline=False
     )
 
     embed.add_field(
         name="🎟️ Ticketing",
-        value="`#ticket` - Open a ticket (if enabled)",
+        value="`//ticket` - Open a ticket (if enabled)",
         inline=False
     )
 
@@ -85,9 +85,9 @@ async def help_admin_command(ctx):
     embed.add_field(
         name="🏆 Leaderboard (admin)",
         value=(
-            "`#cache_leaderboard` - Cache all guild members into the leaderboard\n"
-            "`#addwin [@member]` - Add a win (admin only)\n"
-            "`#subwin [@member]` - Subtract a win (admin only)"
+            "`//cache_leaderboard` - Cache all guild members into the leaderboard\n"
+            "`//addwin [@member]` - Add a win (admin only)\n"
+            "`//subwin [@member]` - Subtract a win (admin only)"
         ),
         inline=False
     )
@@ -95,16 +95,16 @@ async def help_admin_command(ctx):
     embed.add_field(
         name="👥 Members (admin)",
         value=(
-            "`#cache_members` - Cache all members (admin only)\n"
-            "`#member_lookup <id>` - Lookup a member by ID\n"
-            "`#search_member <query>` - Search for members"
+            "`//cache_members` - Cache all members (admin only)\n"
+            "`//member_lookup <id>` - Lookup a member by ID\n"
+            "`//search_member <query>` - Search for members"
         ),
         inline=False
     )
 
     embed.add_field(
         name="🎟️ Ticketing (admin)",
-        value="`#toggle_ticketing` - Toggle ticketing on/off\n`#ticket` - Open a ticket (users)",
+        value="`//toggle_ticketing` - Toggle ticketing on/off\n`#ticket` - Open a ticket (users)",
         inline=False
     )
 
