@@ -10,6 +10,39 @@ import discord
 from discord.ext import commands, tasks
 from datetime import datetime, timedelta
 from Core import compile_members
+from discord.ui import View, button
+
+class CloseTicketView(View):
+    def __init__(self, active_tickets: dict, channel_id: int, author_id: int):
+        super().__init__(timeout=None)  # required for persistence
+        self.active_tickets = active_tickets
+        self.channel_id = channel_id
+        self.author_id = author_id
+
+    @button(
+        label="Close Ticket",
+        style=discord.ButtonStyle.red,
+        emoji="🗑️",
+        custom_id="close_ticket_button"  # 👈 required for persistence
+    )
+    async def close_ticket(self, interaction: discord.Interaction, btn: discord.ui.Button):
+        if interaction.user.id != self.author_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                "❌ Only the ticket creator or an admin can close this ticket.",
+                ephemeral=True
+            )
+            return
+
+        channel = interaction.guild.get_channel(self.channel_id)
+        if channel:
+            await interaction.response.send_message("✅ Closing ticket...", ephemeral=True)
+            try:
+                await channel.delete(reason=f"Closed by {interaction.user}")
+            except Exception as e:
+                await interaction.followup.send(f"❌ Failed to close ticket: {e}", ephemeral=True)
+
+        # remove from active store
+        self.active_tickets.pop(self.author_id, None)
 
 
 class Ticketing(commands.Cog):
@@ -87,12 +120,22 @@ class Ticketing(commands.Cog):
 
         expires = datetime.utcnow() + timedelta(days=2)
         self.active_tickets[ctx.author.id] = {"channel_id": channel.id, "expires": expires}
+        # attach the CloseTicketView
+        view = CloseTicketView(self.bot, self.active_tickets, channel.id, ctx.author.id)
+        self.bot.add_view(view)  # persistent after restart
 
-        await channel.send(embed=discord.Embed(
-            title="🎟️ New Ticket",
-            description=f"{ctx.author.mention}, this channel is private. Submit your answer here. It will be deleted in 2 days.",
-            color=discord.Color.blue()
-        ))
+        await channel.send(
+            embed=discord.Embed(
+                title="🎟️ New Ticket",
+                description=(
+                    f"{ctx.author.mention}, this channel is private. Submit your answer here.\n\n"
+                    "It will be deleted in 2 days, or you can close it manually with the button below."
+                ),
+                color=discord.Color.blue()
+            ),
+            view=view  # ✅ button is attached here
+        )
+
         await ctx.send(embed=discord.Embed(
             description=f"✅ Ticket created: {channel.mention}",
             color=discord.Color.green()

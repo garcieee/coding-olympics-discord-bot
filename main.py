@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 # correct Core imports (case-sensitive)
 from Core.leaderboard import leaderboard
-from Core.ticketing import setup_ticketing
+from Core.ticketing import setup_ticketing, CloseTicketView
 from Core import compile_members
 
 # --------------------
@@ -325,9 +325,12 @@ async def ticket_cmd(ctx):
 
     # Prevent duplicate open ticket
     if ctx.author.id in active_store:
+        ticket_data = active_store[ctx.author.id]
+        channel = bot.get_channel(ticket_data["channel_id"])
+        channel_mention = channel.mention if channel else "your existing ticket"
         await ctx.send(embed=discord.Embed(
             title="⚠️ Ticket Already Open",
-            description="You already have an open ticket. Please use that channel or wait until it is closed.",
+            description=f"You already have an open ticket: {channel_mention}\n\nPlease use that channel or wait until it is closed.",
             color=discord.Color.orange()
         ))
         return
@@ -386,15 +389,20 @@ async def ticket_cmd(ctx):
     expires = datetime.utcnow() + timedelta(days=2)
     active_store[ctx.author.id] = {"channel_id": channel.id, "expires": expires}
 
+    # ✅ Add button view
+    view = CloseTicketView(active_store, channel.id, ctx.author.id)
+    bot.add_view(view)  # persistent after restart
+
     # Send welcome embed in the new channel and confirm to user
     await channel.send(embed=discord.Embed(
         title="🎟️ New Ticket",
         description=(
             f"{ctx.author.mention}, this channel is private. Submit your answer here.\n\n"
-            "A server admin and you can see this channel. It will be deleted in 2 days."
+            "A server admin and you can see this channel.\n"
+            "It will be deleted in 2 days or you can close it manually below."
         ),
         color=discord.Color.blue()
-    ))
+    ), view=view)
 
     await ctx.send(embed=discord.Embed(
         description=f"✅ Ticket created: {channel.mention}",
