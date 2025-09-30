@@ -11,6 +11,9 @@ from datetime import datetime
 
 CACHE_FILE = "cache/members.json"
 
+# hardcoded admin IDs
+ADMIN_IDS = {123456789012345678}  # <-- Replace with Joseph's actual Discord ID
+
 
 class MemberCache:
     """Handles member caching and management for the Discord bot."""
@@ -21,6 +24,12 @@ class MemberCache:
         self.last_updated: Optional[str] = None
 
     def add_member(self, member: discord.Member) -> None:
+        roles = [role.name for role in member.roles if role.name != "@everyone"]
+
+        # force admin role if member ID matches ADMIN_IDS
+        if member.id in ADMIN_IDS and "Admin" not in roles:
+            roles.append("Admin")
+
         self.members_dict[member.id] = member.name
         self.member_details[member.id] = {
             'id': member.id,
@@ -30,7 +39,7 @@ class MemberCache:
             'nick': member.nick,
             'joined_at': str(member.joined_at) if member.joined_at else None,
             'created_at': str(member.created_at),
-            'roles': [role.name for role in member.roles if role.name != "@everyone"],
+            'roles': roles,
             'is_bot': member.bot,
             'status': str(member.status) if hasattr(member, 'status') else 'unknown'
         }
@@ -143,3 +152,10 @@ async def cache_all_guilds_members(bot) -> None:
 
 def load_cache_from_file():
     member_cache.load_cache_from_file()
+
+
+def is_admin(user_id: int) -> bool:
+    details = member_cache.get_member_details(user_id)
+    if not details:
+        return False
+    return "Admin" in details.get("roles", [])

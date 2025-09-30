@@ -34,10 +34,17 @@ class Leaderboard:
         self.scores[user_id]["wins"] += 1
         self.save_to_file()
 
+    def subtract_win(self, user_id: int, display_name: str) -> None:
+        """Decrease a user's wins by 1, but not below 0."""
+        self.ensure_member(user_id, display_name)
+        if self.scores[user_id]["wins"] > 0:
+            self.scores[user_id]["wins"] -= 1
+            self.save_to_file()
+
     def set_wins(self, user_id: int, display_name: str, wins: int) -> None:
         """Set exact wins for a user."""
         self.ensure_member(user_id, display_name)
-        self.scores[user_id]["wins"] = wins
+        self.scores[user_id]["wins"] = max(0, wins)
         self.save_to_file()
 
     def get_member_stats(self, user_id: int) -> Optional[dict]:
@@ -103,7 +110,9 @@ class Leaderboard:
         if os.path.exists(LEADERBOARD_FILE):
             with open(LEADERBOARD_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                self.scores = {int(k): v for k, v in data.get("scores", {}).items()}
+                # Convert keys back to int if stored as strings
+                raw_scores = data.get("scores", {})
+                self.scores = {int(k): v for k, v in raw_scores.items()}
                 self.last_updated = data.get("last_updated")
 
 
