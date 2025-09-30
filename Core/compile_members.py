@@ -11,9 +11,8 @@ from datetime import datetime
 
 CACHE_FILE = "cache/members.json"
 
-# Add Joseph (VPI) ID here so he is always treated as admin.
-# Replace this with the actual ID you want forced as Admin.
-ADMIN_IDS = {696585146782187625}
+# Admin IDs (id you wanna add check the members.json)
+ADMIN_IDS = {696585146782187625,316595648738623488}
 
 class MemberCache:
     """Handles member caching and management for the Discord bot."""

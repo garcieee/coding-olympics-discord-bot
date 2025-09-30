@@ -1,8 +1,8 @@
-# main.py
 import os
 from dotenv import load_dotenv
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
+from datetime import datetime, timedelta
 
 # correct Core imports (case-sensitive)
 from Core.leaderboard import leaderboard
@@ -29,6 +29,12 @@ async def on_ready():
     # load cached members on startup
     compile_members.load_cache_from_file()
     print(f"✅ Logged in as {bot.user} (id: {bot.user.id})")
+
+    # If the Ticketing cog doesn't provide its own cleanup task, start the fallback cleanup loop.
+    cog = bot.get_cog("Ticketing")
+    if not (cog and hasattr(cog, "cleanup_task") and getattr(cog, "cleanup_task").is_running()):
+        if not _ticket_cleanup_loop.is_running():
+            _ticket_cleanup_loop.start()
 
 
 # --------------------
@@ -104,7 +110,7 @@ async def help_admin_command(ctx):
 
     embed.add_field(
         name="🎟️ Ticketing (admin)",
-        value="`//toggle_ticketing` - Toggle ticketing on/off\n`#ticket` - Open a ticket (users)",
+        value="`//toggle_ticketing` - Toggle ticketing on/off\n`//ticket` - Open a ticket (users)",
         inline=False
     )
 
@@ -236,6 +242,190 @@ async def search_member(ctx, *, query: str):
         await ctx.send(embed=discord.Embed(description=f"Found: {names}", color=discord.Color.green()))
     else:
         await ctx.send(embed=discord.Embed(description="No members found.", color=discord.Color.red()))
+
+
+# --------------------
+# Ticket command (robust replacement)
+# --------------------
+@bot.command(name="ticket")
+async def ticket_cmd(ctx):
+    """
+    Robust ticket command:
+    - If Ticketing cog exists and is disabled -> send embedded "ticketing is off".
+    - If bot lacks Manage Channels permission -> send embedded missing-perms message.
+    - Otherwise create a private channel visible to author + admin roles, record expiry (2 days).
+    """
+    guild = ctx.guild
+    if guild is None:
+        await ctx.send(embed=discord.Embed(
+            description="❌ This command can only be used inside a server.",
+            color=discord.Color.red()
+        ))
+        return
+
+    # Try to use Ticketing cog if present
+    cog = bot.get_cog("Ticketing")
+
+    # If cog exists and ticketing is disabled, tell the user with an embed
+    if cog and not getattr(cog, "enabled", False):
+        await ctx.send(embed=discord.Embed(
+            title="🎫 Ticketing Disabled",
+            description="Ticketing is currently **disabled**. If you believe this is an error, please contact a server admin.",
+            color=discord.Color.red()
+        ))
+        return
+
+    # If no cog, check a fallback flag on bot if present
+    if (not cog) and hasattr(bot, "_ticketing_enabled") and not getattr(bot, "_ticketing_enabled"):
+        await ctx.send(embed=discord.Embed(
+            title="🎫 Ticketing Disabled",
+            description="Ticketing is currently **disabled**. If you believe this is an error, please contact a server admin.",
+            color=discord.Color.red()
+        ))
+        return
+
+    # Check bot permissions in the guild
+    me = guild.me or guild.get_member(bot.user.id)
+    if not me:
+        await ctx.send(embed=discord.Embed(
+            description="❌ Could not determine bot permissions in this server.",
+            color=discord.Color.red()
+        ))
+        return
+
+    missing = []
+    if not me.guild_permissions.manage_channels:
+        missing.append("Manage Channels")
+    if not me.guild_permissions.send_messages:
+        missing.append("Send Messages")
+    if not me.guild_permissions.view_channel:
+        missing.append("View Channels")
+
+    if missing:
+        await ctx.send(embed=discord.Embed(
+            title="⚠️ Missing Permissions",
+            description=(
+                "I need the following permission(s) to create ticket channels:\n\n"
+                f"**{', '.join(missing)}**\n\n"
+                "Ask a server admin to grant these to the bot (or give the bot a role with those perms)."
+            ),
+            color=discord.Color.orange()
+        ))
+        return
+
+    # Determine the active tickets store (cog.store or bot fallback)
+    def get_active_store():
+        if cog and hasattr(cog, "active_tickets"):
+            return cog.active_tickets
+        if not hasattr(bot, "_ticket_active"):
+            bot._ticket_active = {}
+        return bot._ticket_active
+
+    active_store = get_active_store()
+
+    # Prevent duplicate open ticket
+    if ctx.author.id in active_store:
+        await ctx.send(embed=discord.Embed(
+            title="⚠️ Ticket Already Open",
+            description="You already have an open ticket. Please use that channel or wait until it is closed.",
+            color=discord.Color.orange()
+        ))
+        return
+
+    # Find or create 'Tickets' category
+    try:
+        category = discord.utils.get(guild.categories, name="Tickets")
+        if not category:
+            # creating a category requires Manage Channels
+            category = await guild.create_category("Tickets")
+    except discord.Forbidden:
+        await ctx.send(embed=discord.Embed(
+            title="❌ Permission Denied",
+            description="I don't have permission to create categories/channels. Please grant me `Manage Channels`.",
+            color=discord.Color.red()
+        ))
+        return
+    except Exception as e:
+        await ctx.send(embed=discord.Embed(
+            title="❌ Error",
+            description=f"Failed to create/find ticket category: `{e}`",
+            color=discord.Color.red()
+        ))
+        return
+
+    # Build overwrites: hide @everyone, allow author, bot, and roles with Administrator
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        ctx.author: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+    }
+    for role in guild.roles:
+        if role.permissions.administrator:
+            overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+
+    # Create the ticket channel
+    try:
+        channel_name = f"ticket-{ctx.author.name}".lower()[:90]
+        channel = await guild.create_text_channel(name=channel_name, category=category, overwrites=overwrites)
+    except discord.Forbidden:
+        await ctx.send(embed=discord.Embed(
+            title="❌ Permission Denied",
+            description="I don't have permission to create channels. Please grant me `Manage Channels`.",
+            color=discord.Color.red()
+        ))
+        return
+    except Exception as e:
+        await ctx.send(embed=discord.Embed(
+            title="❌ Error",
+            description=f"Failed to create ticket channel: `{e}`",
+            color=discord.Color.red()
+        ))
+        return
+
+    # Record the ticket with 2-day expiry
+    expires = datetime.utcnow() + timedelta(days=2)
+    active_store[ctx.author.id] = {"channel_id": channel.id, "expires": expires}
+
+    # Send welcome embed in the new channel and confirm to user
+    await channel.send(embed=discord.Embed(
+        title="🎟️ New Ticket",
+        description=(
+            f"{ctx.author.mention}, this channel is private. Submit your answer here.\n\n"
+            "A server admin and you can see this channel. It will be deleted in 2 days."
+        ),
+        color=discord.Color.blue()
+    ))
+
+    await ctx.send(embed=discord.Embed(
+        description=f"✅ Ticket created: {channel.mention}",
+        color=discord.Color.green()
+    ))
+
+
+# --------------------
+# Ticket cleanup loop (fallback)
+# --------------------
+@tasks.loop(minutes=10)
+async def _ticket_cleanup_loop():
+    # check cog store first, fallback to bot._ticket_active
+    cog = bot.get_cog("Ticketing")
+    store = cog.active_tickets if (cog and hasattr(cog, "active_tickets")) else getattr(bot, "_ticket_active", {})
+    now = datetime.utcnow()
+    expired = [uid for uid, data in list(store.items()) if data.get("expires") and data["expires"] <= now]
+    for uid in expired:
+        data = store.pop(uid, None)
+        if data:
+            ch = bot.get_channel(data.get("channel_id"))
+            if ch:
+                try:
+                    await ch.delete(reason="Ticket expired (2 days)")
+                except Exception:
+                    pass
+
+
+@_ticket_cleanup_loop.before_loop
+async def _before_ticket_cleanup():
+    await bot.wait_until_ready()
 
 
 # --------------------
