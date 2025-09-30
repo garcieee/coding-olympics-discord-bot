@@ -32,13 +32,13 @@ async def on_ready():
 
 
 # --------------------
-# HELP (embed)
+# HELP (member-only embed)
 # --------------------
 @bot.command(name="help")
 async def help_command(ctx):
     embed = discord.Embed(
-        title="📖 Help Menu",
-        description="List of available commands:",
+        title="📖 Help (Members)",
+        description="Commands you can use:",
         color=discord.Color.blue()
     )
 
@@ -53,9 +53,8 @@ async def help_command(ctx):
     )
 
     embed.add_field(
-        name="👥 Members",
+        name="👥 Members (view/search)",
         value=(
-            "`#cache_members` - Cache all members\n"
             "`#member_lookup <id>` - Lookup a member by ID\n"
             "`#search_member <query>` - Search for members"
         ),
@@ -64,17 +63,48 @@ async def help_command(ctx):
 
     embed.add_field(
         name="🎟️ Ticketing",
-        value="`#ticket` - Open a ticket (if enabled)\n`$toggle_ticketing` - Toggle ticketing (admin)",
+        value="`#ticket` - Open a ticket (if enabled)",
         inline=False
     )
 
+    await ctx.send(embed=embed)
+
+
+# --------------------
+# HELP (admin-only embed)
+# --------------------
+@commands.has_permissions(administrator=True)
+@bot.command(name="help_admin")
+async def help_admin_command(ctx):
+    embed = discord.Embed(
+        title="📖 Help (Admins)",
+        description="Admin commands:",
+        color=discord.Color.dark_blue()
+    )
+
     embed.add_field(
-        name="🛠️ Admin",
+        name="🏆 Leaderboard (admin)",
         value=(
             "`#cache_leaderboard` - Cache all guild members into the leaderboard\n"
             "`#addwin [@member]` - Add a win (admin only)\n"
             "`#subwin [@member]` - Subtract a win (admin only)"
         ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="👥 Members (admin)",
+        value=(
+            "`#cache_members` - Cache all members (admin only)\n"
+            "`#member_lookup <id>` - Lookup a member by ID\n"
+            "`#search_member <query>` - Search for members"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎟️ Ticketing (admin)",
+        value="`#toggle_ticketing` - Toggle ticketing on/off\n`#ticket` - Open a ticket (users)",
         inline=False
     )
 
@@ -159,6 +189,7 @@ async def subwin(ctx, member: discord.Member = None):
 # --------------------
 # Cache commands
 # --------------------
+@commands.has_permissions(administrator=True)
 @bot.command(name="cache_members")
 async def cache_members(ctx):
     await compile_members.cache_all_guilds_members(bot)
