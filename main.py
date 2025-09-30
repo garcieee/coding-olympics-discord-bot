@@ -45,9 +45,9 @@ async def help_command(ctx):
     embed.add_field(
         name="🏆 Leaderboard",
         value=(
-            "`$leaderboard` - Show the top leaderboard\n"
-            "`$myrank` - Show your rank & wins\n"
-            "`$lookup @member` - Look up another member’s stats"
+            "`#leaderboard` - Show the top leaderboard\n"
+            "`#myrank` - Show your rank & wins\n"
+            "`#lookup @member` - Look up another member’s stats"
         ),
         inline=False
     )
@@ -55,25 +55,25 @@ async def help_command(ctx):
     embed.add_field(
         name="👥 Members",
         value=(
-            "`$cache_members` - Cache all members\n"
-            "`$member_lookup <id>` - Lookup a member by ID\n"
-            "`$search_member <query>` - Search for members"
+            "`#cache_members` - Cache all members\n"
+            "`#member_lookup <id>` - Lookup a member by ID\n"
+            "`#search_member <query>` - Search for members"
         ),
         inline=False
     )
 
     embed.add_field(
         name="🎟️ Ticketing",
-        value="`$ticket` - Open a ticket (if enabled)\n`$toggle_ticketing` - Toggle ticketing (admin)",
+        value="`#ticket` - Open a ticket (if enabled)\n`$toggle_ticketing` - Toggle ticketing (admin)",
         inline=False
     )
 
     embed.add_field(
         name="🛠️ Admin",
         value=(
-            "`$cache_leaderboard` - Cache all guild members into the leaderboard\n"
-            "`$addwin [@member]` - Add a win (admin only)\n"
-            "`$subwin [@member]` - Subtract a win (admin only)"
+            "`#cache_leaderboard` - Cache all guild members into the leaderboard\n"
+            "`#addwin [@member]` - Add a win (admin only)\n"
+            "`#subwin [@member]` - Subtract a win (admin only)"
         ),
         inline=False
     )
