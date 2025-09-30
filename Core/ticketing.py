@@ -1,17 +1,25 @@
+"""
+Ticketing Cog.
+- Admins can toggle ticketing on/off.
+- Users can create a private ticket channel with $ticket.
+- Ticket channels auto-delete after 2 days.
+All bot responses in this cog are embeds.
+"""
+
 import discord
 from discord.ext import commands, tasks
 from datetime import datetime, timedelta
+from Core import compile_members
 
 
 class Ticketing(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.enabled = False
-        self.active_tickets = {}  # {user_id: {"channel_id": int, "expires": datetime}}
+        self.active_tickets = {}  # user_id -> {channel_id, expires}
+        # don't start loop here; start on_ready
 
-    # --------------------
-    # lifecycle
-    # --------------------
+    # start cleanup when bot ready
     @commands.Cog.listener()
     async def on_ready(self):
         if not self.cleanup_task.is_running():
@@ -21,30 +29,38 @@ class Ticketing(commands.Cog):
         if self.cleanup_task.is_running():
             self.cleanup_task.cancel()
 
-    # --------------------
-    # commands
-    # --------------------
-    @commands.command()
+    # ----------------
+    # admin toggle
+    # ----------------
+    @commands.command(name="toggle_ticketing")
     @commands.has_permissions(administrator=True)
     async def toggle_ticketing(self, ctx):
-        """Enable or disable the ticketing system."""
         self.enabled = not self.enabled
-        status = "enabled" if self.enabled else "disabled"
-        await ctx.send(embed=discord.Embed(
+        status = "enabled ✅" if self.enabled else "disabled ❌"
+        embed = discord.Embed(
             title="🎫 Ticketing System",
-            description=f"Ticketing is now **{status}**",
+            description=f"Ticketing has been **{status}**",
             color=discord.Color.green() if self.enabled else discord.Color.red()
-        ))
+        )
+        await ctx.send(embed=embed)
 
-    @commands.command()
+    # ----------------
+    # user creates ticket
+    # ----------------
+    @commands.command(name="ticket")
     async def ticket(self, ctx):
-        """Create a ticket if ticketing is enabled."""
         if not self.enabled:
-            await ctx.send("❌ Ticketing is currently disabled.")
+            await ctx.send(embed=discord.Embed(
+                description="❌ Ticketing is currently disabled.",
+                color=discord.Color.red()
+            ))
             return
 
         if ctx.author.id in self.active_tickets:
-            await ctx.send("❌ You already have an active ticket.")
+            await ctx.send(embed=discord.Embed(
+                description="⚠️ You already have an open ticket.",
+                color=discord.Color.orange()
+            ))
             return
 
         guild = ctx.guild
@@ -53,14 +69,15 @@ class Ticketing(commands.Cog):
             category = await guild.create_category("Tickets")
 
         overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            ctx.author: discord.PermissionOverwrite(read_messages=True, send_messages=True),
-            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            ctx.author: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
         }
 
+        # allow server admins (roles with administrator) to view
         for role in guild.roles:
             if role.permissions.administrator:
-                overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
         channel = await guild.create_text_channel(
             name=f"ticket-{ctx.author.name}",
@@ -68,37 +85,44 @@ class Ticketing(commands.Cog):
             overwrites=overwrites
         )
 
-        self.active_tickets[ctx.author.id] = {
-            "channel_id": channel.id,
-            "expires": datetime.now() + timedelta(days=2)
-        }
+        expires = datetime.utcnow() + timedelta(days=2)
+        self.active_tickets[ctx.author.id] = {"channel_id": channel.id, "expires": expires}
 
-        await channel.send(
-            embed=discord.Embed(
-                title="🎟️ New Ticket",
-                description=f"{ctx.author.mention}, please submit your answer here.",
-                color=discord.Color.blue()
-            )
-        )
-        await ctx.send(f"✅ Ticket created: {channel.mention}")
+        await channel.send(embed=discord.Embed(
+            title="🎟️ New Ticket",
+            description=f"{ctx.author.mention}, this channel is private. Submit your answer here. It will be deleted in 2 days.",
+            color=discord.Color.blue()
+        ))
+        await ctx.send(embed=discord.Embed(
+            description=f"✅ Ticket created: {channel.mention}",
+            color=discord.Color.green()
+        ))
 
-    # --------------------
-    # cleanup
-    # --------------------
-    @tasks.loop(minutes=1)
+    # ----------------
+    # cleanup loop
+    # ----------------
+    @tasks.loop(minutes=10)
     async def cleanup_task(self):
-        now = datetime.now()
-        expired = [uid for uid, data in self.active_tickets.items() if data["expires"] < now]
-        for uid in expired:
-            data = self.active_tickets.pop(uid)
-            channel = self.bot.get_channel(data["channel_id"])
-            if channel:
-                await channel.delete()
+        now = datetime.utcnow()
+        to_remove = []
+        for uid, data in list(self.active_tickets.items()):
+            if data["expires"] <= now:
+                ch = self.bot.get_channel(data["channel_id"])
+                if ch:
+                    try:
+                        await ch.delete(reason="Ticket expired (2 days)")
+                    except Exception:
+                        pass
+                to_remove.append(uid)
+
+        for uid in to_remove:
+            self.active_tickets.pop(uid, None)
 
     @cleanup_task.before_loop
     async def before_cleanup(self):
         await self.bot.wait_until_ready()
 
 
+# helper to install cog easily from main
 def setup_ticketing(bot):
     bot.add_cog(Ticketing(bot))

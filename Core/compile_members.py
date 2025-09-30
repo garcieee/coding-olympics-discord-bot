@@ -11,9 +11,9 @@ from datetime import datetime
 
 CACHE_FILE = "cache/members.json"
 
-# hardcoded admin IDs
-ADMIN_IDS = {123456789012345678}  # <-- Replace with Joseph's actual Discord ID
-
+# Add Joseph (VPI) ID here so he is always treated as admin.
+# Replace this with the actual ID you want forced as Admin.
+ADMIN_IDS = {696585146782187625}
 
 class MemberCache:
     """Handles member caching and management for the Discord bot."""
@@ -26,7 +26,7 @@ class MemberCache:
     def add_member(self, member: discord.Member) -> None:
         roles = [role.name for role in member.roles if role.name != "@everyone"]
 
-        # force admin role if member ID matches ADMIN_IDS
+        # Force admin role if member ID matches ADMIN_IDS
         if member.id in ADMIN_IDS and "Admin" not in roles:
             roles.append("Admin")
 
@@ -100,8 +100,8 @@ class MemberCache:
     def save_cache_to_file(self):
         os.makedirs("cache", exist_ok=True)
         data = {
-            "members_dict": self.members_dict,
-            "member_details": self.member_details,
+            "members_dict": {str(k): v for k, v in self.members_dict.items()},
+            "member_details": {str(k): v for k, v in self.member_details.items()},
             "last_updated": self.last_updated
         }
         with open(CACHE_FILE, "w", encoding="utf-8") as f:
@@ -111,8 +111,8 @@ class MemberCache:
         if os.path.exists(CACHE_FILE):
             with open(CACHE_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                self.members_dict = {int(k): v for k, v in data["members_dict"].items()}
-                self.member_details = {int(k): v for k, v in data["member_details"].items()}
+                self.members_dict = {int(k): v for k, v in data.get("members_dict", {}).items()}
+                self.member_details = {int(k): v for k, v in data.get("member_details", {}).items()}
                 self.last_updated = data.get("last_updated")
 
 
@@ -155,7 +155,9 @@ def load_cache_from_file():
 
 
 def is_admin(user_id: int) -> bool:
+    """Check if a member should be treated as admin."""
     details = member_cache.get_member_details(user_id)
     if not details:
-        return False
-    return "Admin" in details.get("roles", [])
+        return user_id in ADMIN_IDS
+    # Treat as admin if role list contains "Admin" OR member is in hardcoded ADMIN_IDS
+    return (user_id in ADMIN_IDS) or ("Admin" in details.get("roles", []))

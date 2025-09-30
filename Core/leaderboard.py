@@ -100,7 +100,7 @@ class Leaderboard:
     def save_to_file(self):
         os.makedirs("cache", exist_ok=True)
         data = {
-            "scores": self.scores,
+            "scores": {str(k): v for k, v in self.scores.items()},
             "last_updated": self.last_updated
         }
         with open(LEADERBOARD_FILE, "w", encoding="utf-8") as f:
@@ -110,9 +110,8 @@ class Leaderboard:
         if os.path.exists(LEADERBOARD_FILE):
             with open(LEADERBOARD_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                # Convert keys back to int if stored as strings
-                raw_scores = data.get("scores", {})
-                self.scores = {int(k): v for k, v in raw_scores.items()}
+                raw = data.get("scores", {})
+                self.scores = {int(k): v for k, v in raw.items()}
                 self.last_updated = data.get("last_updated")
 
 
